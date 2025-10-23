@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model answers {
+  attempt_id    BigInt        @db.UnsignedBigInt
+  question_id   BigInt        @db.UnsignedBigInt
+  option_id     BigInt        @db.UnsignedBigInt
+  is_correct    Boolean?
+  quiz_attempts quiz_attempts @relation(fields: [attempt_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_ans_attempt")
+  options       options       @relation(fields: [option_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_ans_option")
+  questions     questions     @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_ans_question")
+
+  @@id([attempt_id, question_id, option_id])
+  @@index([option_id], map: "fk_ans_option")
+  @@index([question_id], map: "fk_ans_question")
+}
+
+model article_bookmarks {
+  user_id    BigInt   @db.UnsignedBigInt
+  article_id BigInt   @db.UnsignedBigInt
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  articles   articles @relation(fields: [article_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_bm_article")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_bm_user")
+
+  @@id([user_id, article_id])
+  @@index([article_id], map: "fk_bm_article")
+}
+
+model articles {
+  id                BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  title             String              @db.VarChar(180)
+  slug              String              @unique(map: "slug") @db.VarChar(190)
+  body_md           String?             @db.MediumText
+  published_at      DateTime?           @db.Timestamp(0)
+  article_bookmarks article_bookmarks[]
+}
+
+model badges {
+  id          BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  code        String        @unique(map: "code") @db.VarChar(50)
+  name        String        @db.VarChar(120)
+  description String?       @db.VarChar(255)
+  user_badges user_badges[]
+}
+
+model categories {
+  id           BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id      BigInt?          @db.UnsignedBigInt
+  name         String           @db.VarChar(80)
+  ctype        categories_ctype
+  users        users?           @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_cat_user")
+  transactions transactions[]
+
+  @@unique([user_id, name, ctype], map: "uq_cat")
+}
+
+model courses {
+  id          BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  title       String         @db.VarChar(150)
+  slug        String         @unique(map: "slug") @db.VarChar(180)
+  description String?        @db.Text
+  level       courses_level? @default(iniciante)
+  created_at  DateTime       @default(now()) @db.Timestamp(0)
+  modules     modules[]
+}
+
+model lesson_progress {
+  user_id    BigInt                 @db.UnsignedBigInt
+  lesson_id  BigInt                 @db.UnsignedBigInt
+  status     lesson_progress_status @default(nao_iniciado)
+  last_pos   Int?                   @default(0)
+  updated_at DateTime               @default(now()) @db.Timestamp(0)
+  lessons    lessons                @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_lp_lesson")
+  users      users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_lp_user")
+
+  @@id([user_id, lesson_id])
+  @@index([lesson_id], map: "fk_lp_lesson")
+}
+
+model lessons {
+  id              BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  module_id       BigInt            @db.UnsignedBigInt
+  title           String            @db.VarChar(180)
+  content_url     String?           @db.VarChar(255)
+  duration_min    Int?
+  sort_order      Int               @default(1)
+  lesson_progress lesson_progress[]
+  modules         modules           @relation(fields: [module_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_lessons_module")
+  quizzes         quizzes?
+
+  @@index([module_id, sort_order], map: "module_id")
+}
+
+model modules {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  course_id  BigInt    @db.UnsignedBigInt
+  title      String    @db.VarChar(150)
+  sort_order Int       @default(1)
+  lessons    lessons[]
+  courses    courses   @relation(fields: [course_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_modules_course")
+
+  @@index([course_id, sort_order], map: "course_id")
+}
+
+model options {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  question_id BigInt    @db.UnsignedBigInt
+  text        String    @db.Text
+  is_correct  Boolean   @default(false)
+  answers     answers[]
+  questions   questions @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_option_question")
+
+  @@index([question_id], map: "question_id")
+}
+
+model profiles {
+  user_id    BigInt   @id @db.UnsignedBigInt
+  school     String?  @db.VarChar(150)
+  grade      String?  @db.VarChar(50)
+  avatar_url String?  @db.VarChar(255)
+  bio        String?  @db.Text
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_profiles_user")
+}
+
+model questions {
+  id         BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  quiz_id    BigInt          @db.UnsignedBigInt
+  text       String          @db.Text
+  qtype      questions_qtype @default(single)
+  sort_order Int             @default(1)
+  answers    answers[]
+  options    options[]
+  quizzes    quizzes         @relation(fields: [quiz_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_question_quiz")
+
+  @@index([quiz_id, sort_order], map: "quiz_id")
+}
+
+model quiz_attempts {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id     BigInt    @db.UnsignedBigInt
+  quiz_id     BigInt    @db.UnsignedBigInt
+  score       Decimal?  @default(0.00) @db.Decimal(5, 2)
+  started_at  DateTime  @default(now()) @db.Timestamp(0)
+  finished_at DateTime? @db.Timestamp(0)
+  answers     answers[]
+  quizzes     quizzes   @relation(fields: [quiz_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_attempt_quiz")
+  users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_attempt_user")
+
+  @@index([quiz_id], map: "fk_attempt_quiz")
+  @@index([user_id, quiz_id, started_at], map: "user_id")
+}
+
+model quizzes {
+  id            BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  lesson_id     BigInt          @unique(map: "uq_quiz_lesson") @db.UnsignedBigInt
+  title         String          @db.VarChar(180)
+  questions     questions[]
+  quiz_attempts quiz_attempts[]
+  lessons       lessons         @relation(fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_quiz_lesson")
+}
+
+model savings_goals {
+  id             BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id        BigInt                @db.UnsignedBigInt
+  name           String                @db.VarChar(120)
+  target_amount  Decimal               @db.Decimal(10, 2)
+  current_amount Decimal               @default(0.00) @db.Decimal(10, 2)
+  deadline       DateTime?             @db.Date
+  status         savings_goals_status? @default(ativo)
+  created_at     DateTime              @default(now()) @db.Timestamp(0)
+  users          users                 @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_goal_user")
+
+  @@index([user_id, status], map: "user_id")
+}
+
+model transactions {
+  id          BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id     BigInt             @db.UnsignedBigInt
+  category_id BigInt             @db.UnsignedBigInt
+  ttype       transactions_ttype
+  amount      Decimal            @db.Decimal(10, 2)
+  occurred_on DateTime           @db.Date
+  note        String?            @db.VarChar(255)
+  created_at  DateTime           @default(now()) @db.Timestamp(0)
+  categories  categories         @relation(fields: [category_id], references: [id], onUpdate: Restrict, map: "fk_tx_cat")
+  users       users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_tx_user")
+
+  @@index([category_id], map: "fk_tx_cat")
+  @@index([user_id, occurred_on], map: "user_id")
+}
+
+model user_badges {
+  user_id    BigInt   @db.UnsignedBigInt
+  badge_id   BigInt   @db.UnsignedBigInt
+  granted_at DateTime @default(now()) @db.Timestamp(0)
+  badges     badges   @relation(fields: [badge_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_ub_badge")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_ub_user")
+
+  @@id([user_id, badge_id])
+  @@index([badge_id], map: "fk_ub_badge")
+}
+
+model users {
+  id                BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  name              String              @db.VarChar(120)
+  email             String              @unique(map: "email") @db.VarChar(190)
+  password_hash     String              @db.VarChar(255)
+  role              users_role          @default(student)
+  created_at        DateTime            @default(now()) @db.Timestamp(0)
+  article_bookmarks article_bookmarks[]
+  categories        categories[]
+  lesson_progress   lesson_progress[]
+  profiles          profiles?
+  quiz_attempts     quiz_attempts[]
+  savings_goals     savings_goals[]
+  transactions      transactions[]
+  user_badges       user_badges[]
+}
+
+enum lesson_progress_status {
+  nao_iniciado
+  em_andamento
+  concluido
+}
+
+enum categories_ctype {
+  income
+  expense
+  saving
+}
+
+enum questions_qtype {
+  single
+  multiple
+}
+
+enum transactions_ttype {
+  income
+  expense
+  saving
+}
+
+enum courses_level {
+  iniciante
+  intermediario
+  avancado
+}
+
+enum users_role {
+  student
+  teacher
+  admin
+}
+
+enum savings_goals_status {
+  ativo
+  concluido
+  cancelado
+}
