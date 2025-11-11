@@ -203,6 +203,7 @@ function App() {
         handleSetUsername={handleSetUsername}
         handleQuizComplete={handleQuizComplete}
         handleProfileUpdate={handleProfileUpdate}
+        handleLogout={handleLogout}
         setIsAuthenticated={setIsAuthenticated}
         quizzesArray={quizzesArray}
       />
@@ -218,6 +219,7 @@ const AppContent = ({
   handleSetUsername, 
   handleQuizComplete, 
   handleProfileUpdate,
+  handleLogout,
   setIsAuthenticated, 
   quizzesArray 
 }) => {
