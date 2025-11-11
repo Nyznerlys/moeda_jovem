@@ -67,7 +67,10 @@ function App() {
   }, [userProfile]);
 
   const handleLogin = (email, password) => {
-    if (email && password) { 
+    if (email && password) {
+      // Atualiza o perfil local para o usuário que fez login
+      const nameFromEmail = String(email).split('@')[0];
+      setUserProfile({ ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: true });
       setIsAuthenticated(true);
       audioManager.playSound('achievement');
       toast({ title: "Login bem-sucedido!", description: "Bem-vindo(a) de volta!" });
@@ -80,8 +83,10 @@ function App() {
 
   const handleCreateAccount = (email, password) => {
      if (email && password) {
+      // Cria um perfil inicial para o novo usuário e força fluxo de escolher nome
+      const nameFromEmail = String(email).split('@')[0];
+      setUserProfile({ ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: false });
       setIsAuthenticated(true);
-      setUserProfile(prev => ({ ...prev, email: email }));
       audioManager.playSound('achievement');
       toast({ title: "Conta criada com sucesso!", description: "Bem-vindo(a) ao Moeda Jovem!" });
       return true;
@@ -89,6 +94,19 @@ function App() {
     audioManager.playSound('incorrect');
     toast({ title: "Erro ao criar conta", description: "Por favor, tente novamente.", variant: "destructive" });
     return false;
+  };
+
+  const handleLogout = () => {
+    // Limpa estado e localStorage (effects irão persistir)
+    setIsAuthenticated(false);
+    setUserProfile(DEFAULT_USER_PROFILE);
+    try {
+      localStorage.removeItem('moedaJovemAuth');
+      localStorage.removeItem('moedaJovemProfile');
+    } catch (e) {
+      // ignore
+    }
+    toast({ title: 'Desconectado', description: 'Você saiu da conta.' });
   };
   
   const handleSetUsername = (username) => {
@@ -232,7 +250,7 @@ const AppContent = ({
               <Route path="/catalogo-quizzes" element={<AnimatedRoute><QuizCatalogScreen quizzes={quizzesArray} userProfile={userProfile} /></AnimatedRoute>} />
               <Route path="/quiz/:quizId" element={<AnimatedRoute><QuizInterfaceScreen quizzes={quizzesArray} onQuizComplete={handleQuizComplete} userProfile={userProfile} /></AnimatedRoute>} />
               <Route path="/resultado-quiz/:quizId" element={<AnimatedRoute><QuizResultScreen quizzes={quizzesArray} userProfile={userProfile} /></AnimatedRoute>} />
-              <Route path="/perfil" element={<AnimatedRoute><UserProfileScreen userProfile={userProfile} onLogout={() => setIsAuthenticated(false)} onProfileUpdate={handleProfileUpdate} learningTracks={LEARNING_TRACKS} /></AnimatedRoute>} />
+              <Route path="/perfil" element={<AnimatedRoute><UserProfileScreen userProfile={userProfile} onLogout={handleLogout} onProfileUpdate={handleProfileUpdate} learningTracks={LEARNING_TRACKS} /></AnimatedRoute>} />
               <Route path="/sobre" element={<AnimatedRoute><AboutScreen /></AnimatedRoute>} />
               <Route path="/secao-tematica" element={<AnimatedRoute><ThematicSection /></AnimatedRoute>} />
               <Route path="/o-que-vai-aprender" element={<AnimatedRoute><WhatYouWillLearnScreen /></AnimatedRoute>} />
