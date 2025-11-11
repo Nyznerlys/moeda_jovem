@@ -146,6 +146,21 @@ function App() {
 
       return newProfile;
     });
+
+    // Tenta persistir a tentativa no backend (serverless /api/quiz-attempts)
+    (async () => {
+      try {
+        const userId = userProfile?.id ?? 1;
+        await fetch('/api/quiz-attempts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, quizId, score, totalQuestions })
+        });
+      } catch (err) {
+        // falha ao persistir no servidor — manter localStorage (fallback já feito)
+        console.error('Failed to persist quiz attempt:', err);
+      }
+    })();
   };
 
   const handleProfileUpdate = (updatedData) => {

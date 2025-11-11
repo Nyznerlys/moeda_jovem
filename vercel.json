@@ -1,5 +1,9 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/health", "destination": "/api/health.js" },
+    { "source": "/courses", "destination": "/api/courses.js" },
+    { "source": "/categories", "destination": "/api/categories.js" },
+    { "source": "/lessons/:id/progress", "destination": "/api/lessons-progress.js" },
+    { "source": "/debug/db", "destination": "/api/debug-db.js" }
   ]
 }
