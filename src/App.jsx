@@ -36,10 +36,9 @@ const pageTransition = {
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-     const savedAuth = localStorage.getItem('moedaJovemAuth');
-     return savedAuth ? JSON.parse(savedAuth) : false;
-  });
+  // Start unauthenticated by default to avoid showing protected UI from a stale localStorage value.
+  // Auth will be hydrated from the server (`/api/auth/me`) or set after a successful login.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState(() => {
     const savedProfile = localStorage.getItem('moedaJovemProfile');
     return savedProfile ? JSON.parse(savedProfile) : DEFAULT_USER_PROFILE;
@@ -66,38 +65,133 @@ function App() {
     audioManager.setMusicEnabled(userProfile.musicEnabled !== false);
   }, [userProfile]);
 
-  const handleLogin = (email, password) => {
-    if (email && password) {
-      // Simple local users registry (localStorage) for dev flow
-      const usersRaw = localStorage.getItem('moedaJovemUsers');
-      const users = usersRaw ? JSON.parse(usersRaw) : {};
+  const handleLogin = async (email, password) => {
+    if (!email || !password) {
+      audioManager.playSound('incorrect');
+      setIsAuthenticated(false);
+      toast({ title: "Erro no Login", description: "Por favor, verifique suas credenciais.", variant: "destructive" });
+      return false;
+    }
 
-      if (!users[email]) {
-        // user not found -> suggest create account
-        return 'not-found';
+    console.debug('[handleLogin] attempt', { email });
+
+    // Try server-side login first
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
+
+      if (res.status === 401) {
+        // server reports invalid credentials — show explicit error (don't redirect to create account)
+        audioManager.playSound('incorrect');
+        setIsAuthenticated(false);
+        toast({ title: "Erro no Login", description: "Email ou senha incorretos.", variant: "destructive" });
+        console.debug('[handleLogin] server rejected credentials for', email);
+        return false;
       }
 
-      // user exists -> load profile
+      if (!res.ok) throw new Error('login_failed');
+
+      const data = await res.json();
+      const user = data?.user;
+      console.debug('[handleLogin] server login OK, user:', user);
+      if (user) {
+        setUserProfile(prev => ({ ...DEFAULT_USER_PROFILE, ...prev, ...user, usernameSetupComplete: !!prev.usernameSetupComplete }));
+        setIsAuthenticated(true);
+        audioManager.playSound('achievement');
+        toast({ title: "Login bem-sucedido!", description: "Bem-vindo(a) de volta!" });
+        return 'ok';
+      }
+    } catch (err) {
+      console.warn('Server login failed, falling back to local registry', err);
+      // continue to fallback
+    }
+
+    // Fallback: local users registry (offline/dev)
+    try {
+      const usersRaw = localStorage.getItem('moedaJovemUsers');
+      const users = usersRaw ? JSON.parse(usersRaw) : {};
       const stored = users[email];
+      console.debug('[handleLogin] fallback stored entry:', stored ? { hasPassword: !!stored.password } : null);
+      if (!stored) return 'not-found';
+
+      // If no password stored locally, we cannot validate offline — require server
+      if (!stored.password) {
+        audioManager.playSound('incorrect');
+        setIsAuthenticated(false);
+        toast({ title: "Não é possível validar a senha offline", description: "Conecte-se à internet e faça login ou recrie a conta localmente.", variant: "destructive" });
+        return false;
+      }
+
+      // Validate password in local registry (dev fallback)
+      if (stored.password !== password) {
+        setIsAuthenticated(false);
+        audioManager.playSound('incorrect');
+        toast({ title: "Senha incorreta", description: "Por favor, verifique sua senha.", variant: "destructive" });
+        return false;
+      }
+
       setUserProfile({ ...DEFAULT_USER_PROFILE, ...stored, usernameSetupComplete: !!stored.usernameSetupComplete });
       setIsAuthenticated(true);
       audioManager.playSound('achievement');
       toast({ title: "Login bem-sucedido!", description: "Bem-vindo(a) de volta!" });
       return 'ok';
+    } catch (e) {
+      setIsAuthenticated(false);
+      audioManager.playSound('incorrect');
+      toast({ title: "Erro no Login", description: "Por favor, verifique suas credenciais.", variant: "destructive" });
+      return false;
     }
-    audioManager.playSound('incorrect');
-    toast({ title: "Erro no Login", description: "Por favor, verifique suas credenciais.", variant: "destructive" });
-    return false;
   };
 
-  const handleCreateAccount = (email, password) => {
-     if (email && password) {
-      // Persist new user in local registry
+  const handleCreateAccount = async (email, password) => {
+    if (!email || !password) {
+      audioManager.playSound('incorrect');
+      toast({ title: "Erro ao criar conta", description: "Por favor, tente novamente.", variant: "destructive" });
+      return false;
+    }
+
+    // Try server-side registration
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
+
+      if (res.status === 409) {
+        toast({ title: 'Conta já existe', description: 'Use outro email ou faça login.' });
+        return 'exists';
+      }
+
+      if (!res.ok) throw new Error('register_failed');
+
+      const data = await res.json();
+      const user = data?.user;
+      if (user) {
+        const newProfile = { ...DEFAULT_USER_PROFILE, ...user, usernameSetupComplete: false };
+        setUserProfile(newProfile);
+        setIsAuthenticated(true);
+        audioManager.playSound('achievement');
+        toast({ title: "Conta criada com sucesso!", description: "Bem-vindo(a) ao Moeda Jovem!" });
+        return 'ok';
+      }
+    } catch (err) {
+      console.warn('Server register failed, falling back to local registry', err);
+    }
+
+    // Fallback: local registry
+    try {
       const usersRaw = localStorage.getItem('moedaJovemUsers');
       const users = usersRaw ? JSON.parse(usersRaw) : {};
       const nameFromEmail = String(email).split('@')[0];
       const newProfile = { ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: false };
-      users[email] = newProfile;
+      // store password in local registry for dev auth (not secure, only for local/dev)
+      users[email] = { ...newProfile, password };
       try { localStorage.setItem('moedaJovemUsers', JSON.stringify(users)); } catch (e) { /* ignore */ }
 
       setUserProfile(newProfile);
@@ -105,23 +199,31 @@ function App() {
       audioManager.playSound('achievement');
       toast({ title: "Conta criada com sucesso!", description: "Bem-vindo(a) ao Moeda Jovem!" });
       return 'ok';
+    } catch (e) {
+      audioManager.playSound('incorrect');
+      toast({ title: "Erro ao criar conta", description: "Por favor, tente novamente.", variant: "destructive" });
+      return false;
     }
-    audioManager.playSound('incorrect');
-    toast({ title: "Erro ao criar conta", description: "Por favor, tente novamente.", variant: "destructive" });
-    return false;
   };
 
   const handleLogout = () => {
-    // Limpa estado e localStorage (effects irão persistir)
-    setIsAuthenticated(false);
-    setUserProfile(DEFAULT_USER_PROFILE);
-    try {
-      localStorage.removeItem('moedaJovemAuth');
-      localStorage.removeItem('moedaJovemProfile');
-    } catch (e) {
-      // ignore
-    }
-    toast({ title: 'Desconectado', description: 'Você saiu da conta.' });
+    // Call server to clear cookies, then clear local state
+    (async () => {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch (e) {
+        // ignore network errors
+      }
+      setIsAuthenticated(false);
+      setUserProfile(DEFAULT_USER_PROFILE);
+      try {
+        localStorage.removeItem('moedaJovemAuth');
+        localStorage.removeItem('moedaJovemProfile');
+      } catch (e) {
+        // ignore
+      }
+      toast({ title: 'Desconectado', description: 'Você saiu da conta.' });
+    })();
   };
   
   const handleSetUsername = (username) => {
@@ -131,7 +233,9 @@ function App() {
         const usersRaw = localStorage.getItem('moedaJovemUsers');
         const users = usersRaw ? JSON.parse(usersRaw) : {};
         if (newProfile.email) {
-          users[newProfile.email] = newProfile;
+          const existing = users[newProfile.email] || {};
+          // preserve existing fields (like password) when updating username
+          users[newProfile.email] = { ...existing, ...newProfile };
           localStorage.setItem('moedaJovemUsers', JSON.stringify(users));
         }
       } catch (e) {
@@ -197,17 +301,44 @@ function App() {
     (async () => {
       try {
         const userId = userProfile?.id ?? 1;
-        await fetch('/api/quiz-attempts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, quizId, score, totalQuestions })
-        });
+        // The server expects a numeric quiz_id. Our frontend uses string keys (e.g. 'q1_1').
+        // Only send to server when quizId is numeric to avoid server 400 errors.
+        const numericQuizId = Number(quizId);
+        if (!Number.isNaN(numericQuizId) && numericQuizId > 0) {
+          await fetch('/api/quiz-attempts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId, quizId: numericQuizId, score, totalQuestions })
+          });
+        } else {
+          console.debug('[handleQuizComplete] skipping server persist — quizId is non-numeric:', quizId);
+        }
       } catch (err) {
         // falha ao persistir no servidor — manter localStorage (fallback já feito)
         console.error('Failed to persist quiz attempt:', err);
       }
     })();
   };
+
+  // On mount try to hydrate auth state from server (if cookies present)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          const user = data?.user;
+          if (user) {
+            setUserProfile(prev => ({ ...DEFAULT_USER_PROFILE, ...prev, ...user, usernameSetupComplete: !!prev.usernameSetupComplete }));
+            setIsAuthenticated(true);
+          }
+        }
+      } catch (e) {
+        // ignore - remain unauthenticated
+      }
+    })();
+  }, []);
 
   const handleProfileUpdate = (updatedData) => {
     setUserProfile(prev => ({ ...prev, ...updatedData }));

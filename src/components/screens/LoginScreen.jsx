@@ -12,13 +12,13 @@ const LoginScreen = ({ onLogin, isCreatingAccount = false }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (isCreatingAccount && password !== confirmPassword) {
       alert("As senhas não coincidem!");
       return;
     }
-    const result = onLogin(email, password);
+    const result = await onLogin(email, password);
     if (result === 'ok') {
       if (isCreatingAccount) {
         navigate('/verificacao'); 

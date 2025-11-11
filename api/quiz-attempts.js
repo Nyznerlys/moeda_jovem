@@ -1,4 +1,6 @@
 import { getPool } from './_db.js';
+import jwt from 'jsonwebtoken';
+import { parse } from 'cookie';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -21,7 +23,24 @@ export default async function handler(req, res) {
       req.on('error', reject);
     });
 
-    const userId = Number(body.userId ?? 1);
+    // Prefer authenticated user from access_token cookie if available
+    let userId = Number(body.userId ?? 0);
+    try {
+      const cookieHeader = req.headers?.cookie || '';
+      const cookies = cookieHeader ? parse(cookieHeader) : {};
+      const access = cookies['access_token'];
+      const accessSecret = process.env.JWT_ACCESS_SECRET;
+      if (access && accessSecret) {
+        const payload = jwt.verify(access, accessSecret);
+        if (payload && payload.sub) {
+          userId = Number(payload.sub) || userId;
+        }
+      }
+    } catch (e) {
+      // ignore token errors and fall back to provided userId
+      console.warn('quiz-attempts: access token invalid or missing, falling back to body.userId');
+    }
+    if (!userId) userId = 1;
     const quizId = Number(body.quizId);
     const score = Number(body.score ?? 0);
     const totalQuestions = Number(body.totalQuestions ?? 0);
