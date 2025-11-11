@@ -19,6 +19,9 @@ const QuizResultScreen = ({ quizzes, userProfile }) => {
   const quiz = quizzes.find(q => q.id === quizId);
   const result = userProfile.completedQuizzes[quizId];
 
+  const level = Number(userProfile.level ?? 1);
+  const xp = Number(userProfile.xp ?? 0);
+
   useEffect(() => {
     const handleResize = () => {
       setWindowDimensions({
@@ -253,11 +256,11 @@ const QuizResultScreen = ({ quizzes, userProfile }) => {
           <h4 className="font-semibold text-text-dark mb-3">Seu Progresso:</h4>
           <div className="grid grid-cols-3 gap-4 text-center">
             <motion.div whileHover={{ scale: 1.05 }}>
-              <p className="text-2xl font-bold text-primary-green">{userProfile.level}</p>
+              <p className="text-2xl font-bold text-primary-green">{level}</p>
               <p className="text-sm text-text-gray">Nível</p>
             </motion.div>
             <motion.div whileHover={{ scale: 1.05 }}>
-              <p className="text-2xl font-bold text-accent-blue">{userProfile.xp}</p>
+              <p className="text-2xl font-bold text-accent-blue">{xp}</p>
               <p className="text-sm text-text-gray">XP Total</p>
             </motion.div>
             <motion.div whileHover={{ scale: 1.05 }}>

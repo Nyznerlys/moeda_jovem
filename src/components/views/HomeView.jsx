@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Star, Coins, Flame, Play, CheckCircle, BarChart3 } from 'lucide-react';
 
 const HomeView = ({ userProfile, learningTracks, onStartQuiz }) => {
+  const level = Number(userProfile.level ?? 1);
+  const xp = Number(userProfile.xp ?? 0);
+  const coins = Number(userProfile.coins ?? 0);
+  const streak = Number(userProfile.streak ?? 0);
   return (
     <div className="min-h-screen p-4">
       <motion.div 
@@ -27,23 +31,23 @@ const HomeView = ({ userProfile, learningTracks, onStartQuiz }) => {
             <div className="card-gradient rounded-xl p-4 text-center">
               <div className="flex items-center gap-2 justify-center mb-2">
                 <Star className="w-5 h-5 text-yellow-400" />
-                <span className="font-semibold">Nível {userProfile.level}</span>
+                <span className="font-semibold">Nível {level}</span>
               </div>
-              <div className="text-sm text-white/60">{userProfile.xp} XP</div>
+              <div className="text-sm text-white/60">{xp} XP</div>
             </div>
             
             <div className="card-gradient rounded-xl p-4 text-center">
               <div className="flex items-center gap-2 justify-center mb-2">
                 <Coins className="w-5 h-5 text-yellow-400 coin-animation" />
-                <span className="font-semibold">{userProfile.coins}</span>
+                <span className="font-semibold">{coins}</span>
               </div>
               <div className="text-sm text-white/60">Moedas</div>
             </div>
             
             <div className="card-gradient rounded-xl p-4 text-center">
               <div className="flex items-center gap-2 justify-center mb-2">
-                <Flame className={`w-5 h-5 text-orange-400 ${userProfile.streak > 0 ? 'streak-fire' : ''}`} />
-                <span className="font-semibold">{userProfile.streak}</span>
+                <Flame className={`w-5 h-5 text-orange-400 ${streak > 0 ? 'streak-fire' : ''}`} />
+                <span className="font-semibold">{streak}</span>
               </div>
               <div className="text-sm text-white/60">Sequência</div>
             </div>
@@ -100,12 +104,12 @@ const HomeView = ({ userProfile, learningTracks, onStartQuiz }) => {
             </div>
             
             <div className="text-center">
-              <div className="text-2xl font-bold text-teal-400">{Math.floor(userProfile.xp / 100)}</div>
+              <div className="text-2xl font-bold text-teal-400">{Math.floor(xp / 100)}</div>
               <div className="text-sm text-white/60">Níveis Alcançados</div>
             </div>
             
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-400">{userProfile.coins}</div>
+              <div className="text-2xl font-bold text-yellow-400">{coins}</div>
               <div className="text-sm text-white/60">Total de Moedas</div>
             </div>
           </div>

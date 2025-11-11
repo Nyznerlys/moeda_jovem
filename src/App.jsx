@@ -46,6 +46,19 @@ function App() {
 
   const { toast } = useToast();
 
+  const normalizeProfile = (p) => {
+    const profile = { ...DEFAULT_USER_PROFILE, ...(p || {}) };
+    return {
+      ...profile,
+      xp: Number(profile.xp ?? 0),
+      coins: Number(profile.coins ?? 0),
+      level: Number(profile.level ?? 1),
+      streak: Number(profile.streak ?? 0),
+      completedQuizzes: profile.completedQuizzes || {},
+      achievements: profile.achievements || []
+    };
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -99,7 +112,21 @@ function App() {
       const user = data?.user;
       console.debug('[handleLogin] server login OK, user:', user);
       if (user) {
-        setUserProfile(prev => ({ ...DEFAULT_USER_PROFILE, ...prev, ...user, usernameSetupComplete: !!prev.usernameSetupComplete }));
+        setUserProfile(prev => normalizeProfile({
+          ...DEFAULT_USER_PROFILE,
+          ...prev,
+          // merge server profile fields if present
+          ...(user.profile || {}),
+          // basic user info
+          id: user.id,
+          name: user.name || prev.name,
+          email: user.email || prev.email,
+          usernameSetupComplete: !!prev.usernameSetupComplete
+        }));
+        // If server returned a devAuth flag (no cookies set because JWT secrets missing), persist dev user id locally
+        if (data.devAuth && user.id) {
+          try { localStorage.setItem('moedaJovemDevUserId', String(user.id)); } catch (e) {}
+        }
         setIsAuthenticated(true);
         audioManager.playSound('achievement');
         toast({ title: "Login bem-sucedido!", description: "Bem-vindo(a) de volta!" });
@@ -173,8 +200,11 @@ function App() {
       const data = await res.json();
       const user = data?.user;
       if (user) {
-        const newProfile = { ...DEFAULT_USER_PROFILE, ...user, usernameSetupComplete: false };
-        setUserProfile(newProfile);
+  const newProfile = normalizeProfile({ ...DEFAULT_USER_PROFILE, ...(user.profile || {}), ...user, usernameSetupComplete: false });
+  setUserProfile(newProfile);
+        if (data.devAuth && user.id) {
+          try { localStorage.setItem('moedaJovemDevUserId', String(user.id)); } catch (e) {}
+        }
         setIsAuthenticated(true);
         audioManager.playSound('achievement');
         toast({ title: "Conta criada com sucesso!", description: "Bem-vindo(a) ao Moeda Jovem!" });
@@ -189,12 +219,12 @@ function App() {
       const usersRaw = localStorage.getItem('moedaJovemUsers');
       const users = usersRaw ? JSON.parse(usersRaw) : {};
       const nameFromEmail = String(email).split('@')[0];
-      const newProfile = { ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: false };
+  const newProfile = normalizeProfile({ ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: false });
       // store password in local registry for dev auth (not secure, only for local/dev)
       users[email] = { ...newProfile, password };
       try { localStorage.setItem('moedaJovemUsers', JSON.stringify(users)); } catch (e) { /* ignore */ }
 
-      setUserProfile(newProfile);
+  setUserProfile(newProfile);
       setIsAuthenticated(true);
       audioManager.playSound('achievement');
       toast({ title: "Conta criada com sucesso!", description: "Bem-vindo(a) ao Moeda Jovem!" });
@@ -219,6 +249,7 @@ function App() {
       try {
         localStorage.removeItem('moedaJovemAuth');
         localStorage.removeItem('moedaJovemProfile');
+        localStorage.removeItem('moedaJovemDevUserId');
       } catch (e) {
         // ignore
       }
@@ -228,7 +259,7 @@ function App() {
   
   const handleSetUsername = (username) => {
     setUserProfile(prev => {
-      const newProfile = { ...prev, name: username, usernameSetupComplete: true };
+      const newProfile = normalizeProfile({ ...prev, name: username, usernameSetupComplete: true });
       try {
         const usersRaw = localStorage.getItem('moedaJovemUsers');
         const users = usersRaw ? JSON.parse(usersRaw) : {};
@@ -320,11 +351,16 @@ function App() {
         if (isAuthenticated && newProfile && (newProfile.id || userProfile?.id)) {
           const targetUserId = newProfile.id || userProfile?.id;
           try {
+            // include dev user id header if present (used when JWT cookies are not available in preview/dev)
+            const devId = localStorage.getItem('moedaJovemDevUserId');
+            const headers = { 'Content-Type': 'application/json' };
+            if (devId) headers['x-dev-user-id'] = devId;
+
             await fetch('/api/auth/me', {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers,
               credentials: 'include',
-              body: JSON.stringify({ profile: { xp: newProfile.xp, coins: newProfile.coins, completedQuizzes: newProfile.completedQuizzes, level: newProfile.level } })
+              body: JSON.stringify({ profile: { xp: newProfile.xp, coins: newProfile.coins, completedQuizzes: newProfile.completedQuizzes, level: newProfile.level }, userId: devId ? Number(devId) : undefined })
             });
           } catch (e) {
             console.warn('Failed to persist profile to server:', e);
@@ -341,12 +377,21 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
+        // Try cookie-based hydrate first
+        let res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
+        if (!res.ok) {
+          // If cookie-based failed, try dev fallback using stored dev user id (if present)
+          const devId = localStorage.getItem('moedaJovemDevUserId');
+          if (devId) {
+            res = await fetch('/api/auth/me', { method: 'GET', credentials: 'include', headers: { 'x-dev-user-id': devId } });
+          }
+        }
+
         if (res.ok) {
           const data = await res.json();
           const user = data?.user;
           if (user) {
-            setUserProfile(prev => ({ ...DEFAULT_USER_PROFILE, ...prev, ...user, usernameSetupComplete: !!prev.usernameSetupComplete }));
+            setUserProfile(prev => normalizeProfile({ ...DEFAULT_USER_PROFILE, ...prev, ...user, usernameSetupComplete: !!prev.usernameSetupComplete }));
             setIsAuthenticated(true);
           }
         }
@@ -357,7 +402,7 @@ function App() {
   }, []);
 
   const handleProfileUpdate = (updatedData) => {
-    setUserProfile(prev => ({ ...prev, ...updatedData }));
+    setUserProfile(prev => normalizeProfile({ ...prev, ...updatedData }));
     audioManager.playSound('achievement');
     toast({ title: "Perfil atualizado!", description: "Suas alterações foram salvas com sucesso!" });
   };

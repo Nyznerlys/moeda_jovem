@@ -77,9 +77,18 @@ const UserProfileScreen = ({ userProfile, onLogout, onProfileUpdate, appName = "
   });
 
   // Calcular nível baseado no XP
-  const currentLevelXP = (userProfile.level - 1) * 100;
-  const nextLevelXP = userProfile.level * 100;
-  const progressToNextLevel = ((userProfile.xp - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100;
+  // Ensure numeric values to avoid string concatenation or NaN
+  const level = Number(userProfile.level ?? 1);
+  const xp = Number(userProfile.xp ?? 0);
+  const coins = Number(userProfile.coins ?? 0);
+  const streak = Number(userProfile.streak ?? 0);
+
+  const currentLevelXP = (level - 1) * 100;
+  const nextLevelXP = level * 100;
+  let progressToNextLevel = ((xp - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100;
+  // Clamp between 0 and 100 to avoid NaN/overflow
+  if (!Number.isFinite(progressToNextLevel)) progressToNextLevel = 0;
+  progressToNextLevel = Math.max(0, Math.min(100, Math.round(progressToNextLevel)));
 
   const handleEditProfile = () => {
     audioManager.playSound('click');
@@ -149,24 +158,24 @@ const UserProfileScreen = ({ userProfile, onLogout, onProfileUpdate, appName = "
                 
                 <div className="text-center md:text-left flex-grow">
                   <h2 className="text-3xl font-bold text-text-dark mb-2">{userProfile.name}</h2>
-                  <p className="text-text-gray mb-4">Nível {userProfile.level} - Aprendiz Financeiro</p>
+                  <p className="text-text-gray mb-4">Nível {level} - Aprendiz Financeiro</p>
                   
                   {/* Progresso para próximo nível */}
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-text-gray mb-1">
-                      <span>Progresso para Nível {userProfile.level + 1}</span>
+                      <span>Progresso para Nível {level + 1}</span>
                       <span>{Math.round(progressToNextLevel)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
                       <motion.div
                         className="bg-gradient-to-r from-primary-green to-primary-green-medium h-3 rounded-full"
                         initial={{ width: 0 }}
-                        animate={{ width: `${progressToNextLevel}%` }}
+                          animate={{ width: `${progressToNextLevel}%` }}
                         transition={{ duration: 1, ease: "easeOut" }}
                       />
                     </div>
                     <p className="text-xs text-text-gray mt-1">
-                      {nextLevelXP - userProfile.xp} XP para o próximo nível
+                      {Math.max(0, nextLevelXP - xp)} XP para o próximo nível
                     </p>
                   </div>
                 </div>
@@ -194,7 +203,7 @@ const UserProfileScreen = ({ userProfile, onLogout, onProfileUpdate, appName = "
                   className="bg-accent-blue-light p-4 rounded-lg text-center cursor-pointer"
                 >
                   <Star className="w-8 h-8 text-accent-blue mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-accent-blue">{userProfile.xp}</p>
+                  <p className="text-2xl font-bold text-accent-blue">{xp}</p>
                   <p className="text-sm text-text-gray">XP Total</p>
                 </motion.div>
                 <motion.div 
@@ -202,7 +211,7 @@ const UserProfileScreen = ({ userProfile, onLogout, onProfileUpdate, appName = "
                   className="bg-yellow-100 p-4 rounded-lg text-center cursor-pointer"
                 >
                   <Coins className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-yellow-600">{userProfile.coins}</p>
+                  <p className="text-2xl font-bold text-yellow-600">{coins}</p>
                   <p className="text-sm text-text-gray">Moedas</p>
                 </motion.div>
                 <motion.div 
@@ -210,7 +219,7 @@ const UserProfileScreen = ({ userProfile, onLogout, onProfileUpdate, appName = "
                   className="bg-orange-100 p-4 rounded-lg text-center cursor-pointer"
                 >
                   <Zap className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-orange-500">{userProfile.streak}</p>
+                  <p className="text-2xl font-bold text-orange-500">{streak}</p>
                   <p className="text-sm text-text-gray">Sequência</p>
                 </motion.div>
               </div>

@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Home, User, Award, CheckCircle } from 'lucide-react';
 
 const ProfileView = ({ userProfile, learningTracks, onNavigateHome }) => {
+  const level = Number(userProfile.level ?? 1);
+  const xp = Number(userProfile.xp ?? 0);
+  const coins = Number(userProfile.coins ?? 0);
+  const streak = Number(userProfile.streak ?? 0);
   return (
     <div className="min-h-screen p-4">
       <motion.div 
@@ -30,20 +34,20 @@ const ProfileView = ({ userProfile, learningTracks, onNavigateHome }) => {
           <h2 className="text-2xl font-bold mb-2">{userProfile.name}</h2>
           
           <div className="level-badge inline-block px-4 py-2 rounded-full mb-4">
-            Nível {userProfile.level}
+            Nível {level}
           </div>
           
           <div className="grid grid-cols-3 gap-4 mt-6">
             <div>
-              <div className="text-2xl font-bold text-yellow-400">{userProfile.coins}</div>
+              <div className="text-2xl font-bold text-yellow-400">{coins}</div>
               <div className="text-sm text-white/60">Moedas</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-teal-400">{userProfile.xp}</div>
+              <div className="text-2xl font-bold text-teal-400">{xp}</div>
               <div className="text-sm text-white/60">XP Total</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-orange-400">{userProfile.streak}</div>
+              <div className="text-2xl font-bold text-orange-400">{streak}</div>
               <div className="text-sm text-white/60">Sequência</div>
             </div>
           </div>

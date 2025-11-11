@@ -5,5 +5,7 @@
     { "source": "/categories", "destination": "/api/categories.js" },
     { "source": "/lessons/:id/progress", "destination": "/api/lessons-progress.js" },
     { "source": "/debug/db", "destination": "/api/debug-db.js" }
+    ,
+    { "source": "/((?!api/).*)", "destination": "/" }
   ]
 }

@@ -8,17 +8,63 @@ export default async function handler(req, res) {
     const cookies = parseCookies(req);
     const token = cookies['access_token'];
     const accessSecret = process.env.JWT_ACCESS_SECRET;
-    if (!token) {
-      res.status(401).end(JSON.stringify({ error: 'no_token' }));
-      return;
-    }
-    if (!accessSecret) {
-      res.status(500).end(JSON.stringify({ error: 'missing_jwt_secret' }));
-      return;
+
+    let userId = null;
+
+    // Prefer cookie-based JWT if present
+    if (token && accessSecret) {
+      try {
+        const payload = jwt.verify(token, accessSecret);
+        userId = payload.sub;
+      } catch (e) {
+        console.warn('Invalid access token:', e.message || e);
+        res.status(401).end(JSON.stringify({ error: 'invalid_token', details: String(e.message || e) }));
+        return;
+      }
     }
 
-    const payload = jwt.verify(token, accessSecret);
-    const userId = payload.sub;
+    // Developer fallback: when JWT secrets / cookie are not available, allow identifying user by header or body
+    // but only outside production environments.
+    if (!userId) {
+      if (process.env.VERCEL_ENV === 'production') {
+        res.status(401).end(JSON.stringify({ error: 'no_token' }));
+        return;
+      }
+
+      // try header first
+      const devIdHeader = req.headers && (req.headers['x-dev-user-id'] || req.headers['x-dev-user-email']);
+      if (devIdHeader) {
+        // header may be numeric id or email; if numeric use as id, else look up by email
+        const maybeId = Number(devIdHeader);
+        if (!Number.isNaN(maybeId) && maybeId > 0) {
+          userId = maybeId;
+        } else {
+          // lookup by email
+          const pool = getPool();
+          const [rows] = await pool.query('SELECT id FROM users WHERE email = ? LIMIT 1', [devIdHeader]);
+          if (rows.length) userId = rows[0].id;
+        }
+      }
+
+      // if still no userId, and this is a PATCH, try reading body.userId
+      if (!userId && req.method === 'PATCH') {
+        const body = await new Promise((resolve, reject) => {
+          let data = '';
+          req.on('data', c => (data += c));
+          req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } });
+          req.on('error', reject);
+        });
+        if (body && body.userId) {
+          const maybeId = Number(body.userId);
+          if (!Number.isNaN(maybeId) && maybeId > 0) userId = maybeId;
+        }
+      }
+
+      if (!userId) {
+        res.status(401).end(JSON.stringify({ error: 'no_token' }));
+        return;
+      }
+    }
     const pool = getPool();
 
     if (req.method === 'GET') {

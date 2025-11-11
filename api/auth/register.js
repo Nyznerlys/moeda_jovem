@@ -38,8 +38,16 @@ export default async function handler(req, res) {
     // create tokens
     const accessSecret = process.env.JWT_ACCESS_SECRET;
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+    // Developer fallback when JWT secrets are missing (only outside production).
     if (!accessSecret || !refreshSecret) {
-      res.status(500).end(JSON.stringify({ error: 'missing_jwt_secrets' }));
+      if (process.env.VERCEL_ENV === 'production') {
+        res.status(500).end(JSON.stringify({ error: 'missing_jwt_secrets' }));
+        return;
+      }
+
+      console.warn('JWT secrets missing — returning dev user object (no cookies will be set)');
+      res.status(201).end(JSON.stringify({ ok: true, user: { id: userId, email, name: displayName }, devAuth: true }));
       return;
     }
 

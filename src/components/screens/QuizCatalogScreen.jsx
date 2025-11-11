@@ -108,6 +108,10 @@ const QuizCatalogScreen = ({ quizzes, userProfile }) => {
   const [selectedDifficulty, setSelectedDifficulty] = useState('Todos');
   const location = useLocation();
 
+  // Normalize numeric profile values to avoid string concatenation or NaN
+  const level = Number(userProfile.level ?? 1);
+  const xp = Number(userProfile.xp ?? 0);
+
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
@@ -128,7 +132,7 @@ const QuizCatalogScreen = ({ quizzes, userProfile }) => {
 
     quizzes.forEach(quiz => {
       const difficultyInfo = DIFFICULTY_LEVELS[quiz.difficulty];
-      const isUnlocked = userProfile.level >= difficultyInfo.minLevel;
+      const isUnlocked = level >= difficultyInfo.minLevel;
       
       // Sistema de desbloqueio adicional baseado em quizzes completados
       let additionalUnlock = true;
@@ -146,7 +150,7 @@ const QuizCatalogScreen = ({ quizzes, userProfile }) => {
     });
 
     return { availableQuizzes: available, lockedQuizzes: locked };
-  }, [quizzes, userProfile.level, completedCount]);
+  }, [quizzes, level, completedCount]);
 
   const filteredQuizzes = useMemo(() => {
     const allQuizzes = [...availableQuizzes, ...lockedQuizzes];
@@ -183,11 +187,11 @@ const QuizCatalogScreen = ({ quizzes, userProfile }) => {
             </div>
             <div className="flex items-center gap-2 bg-blue-100 px-3 py-1 rounded-full">
               <Star className="w-4 h-4 text-blue-600" />
-              <span className="text-blue-800">Nível {userProfile.level}</span>
+              <span className="text-blue-800">Nível {level}</span>
             </div>
             <div className="flex items-center gap-2 bg-yellow-100 px-3 py-1 rounded-full">
               <Trophy className="w-4 h-4 text-yellow-600" />
-              <span className="text-yellow-800">{userProfile.xp} XP</span>
+              <span className="text-yellow-800">{xp} XP</span>
             </div>
           </div>
         </motion.div>
