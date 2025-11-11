@@ -18,13 +18,16 @@ const LoginScreen = ({ onLogin, isCreatingAccount = false }) => {
       alert("As senhas não coincidem!");
       return;
     }
-    const success = onLogin(email, password);
-    if (success) {
+    const result = onLogin(email, password);
+    if (result === 'ok') {
       if (isCreatingAccount) {
         navigate('/verificacao'); 
       } else {
         navigate('/escolher-nome');
       }
+    } else if (result === 'not-found') {
+      // redireciona direto para criar conta se não existir
+      navigate('/criar-conta');
     }
   };
 

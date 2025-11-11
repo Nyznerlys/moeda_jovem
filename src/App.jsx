@@ -68,13 +68,22 @@ function App() {
 
   const handleLogin = (email, password) => {
     if (email && password) {
-      // Atualiza o perfil local para o usuário que fez login
-      const nameFromEmail = String(email).split('@')[0];
-      setUserProfile({ ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: true });
+      // Simple local users registry (localStorage) for dev flow
+      const usersRaw = localStorage.getItem('moedaJovemUsers');
+      const users = usersRaw ? JSON.parse(usersRaw) : {};
+
+      if (!users[email]) {
+        // user not found -> suggest create account
+        return 'not-found';
+      }
+
+      // user exists -> load profile
+      const stored = users[email];
+      setUserProfile({ ...DEFAULT_USER_PROFILE, ...stored, usernameSetupComplete: !!stored.usernameSetupComplete });
       setIsAuthenticated(true);
       audioManager.playSound('achievement');
       toast({ title: "Login bem-sucedido!", description: "Bem-vindo(a) de volta!" });
-      return true;
+      return 'ok';
     }
     audioManager.playSound('incorrect');
     toast({ title: "Erro no Login", description: "Por favor, verifique suas credenciais.", variant: "destructive" });
@@ -83,13 +92,19 @@ function App() {
 
   const handleCreateAccount = (email, password) => {
      if (email && password) {
-      // Cria um perfil inicial para o novo usuário e força fluxo de escolher nome
+      // Persist new user in local registry
+      const usersRaw = localStorage.getItem('moedaJovemUsers');
+      const users = usersRaw ? JSON.parse(usersRaw) : {};
       const nameFromEmail = String(email).split('@')[0];
-      setUserProfile({ ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: false });
+      const newProfile = { ...DEFAULT_USER_PROFILE, email, name: nameFromEmail, usernameSetupComplete: false };
+      users[email] = newProfile;
+      try { localStorage.setItem('moedaJovemUsers', JSON.stringify(users)); } catch (e) { /* ignore */ }
+
+      setUserProfile(newProfile);
       setIsAuthenticated(true);
       audioManager.playSound('achievement');
       toast({ title: "Conta criada com sucesso!", description: "Bem-vindo(a) ao Moeda Jovem!" });
-      return true;
+      return 'ok';
     }
     audioManager.playSound('incorrect');
     toast({ title: "Erro ao criar conta", description: "Por favor, tente novamente.", variant: "destructive" });
