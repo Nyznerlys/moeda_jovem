@@ -262,8 +262,10 @@ function App() {
       audioManager.playSound('coin');
     }
     
+    // Build new profile immediately so we can persist it to server
+    let newProfile;
     setUserProfile(prev => {
-      const newProfile = {
+      newProfile = {
         ...prev,
         xp: prev.xp + earnedXP,
         coins: prev.coins + earnedCoins,
@@ -300,23 +302,37 @@ function App() {
     // Tenta persistir a tentativa no backend (serverless /api/quiz-attempts)
     (async () => {
       try {
-        const userId = userProfile?.id ?? 1;
-        // The server expects a numeric quiz_id. Our frontend uses string keys (e.g. 'q1_1').
-        // Only send to server when quizId is numeric to avoid server 400 errors.
+        // Persist quiz attempt when we have a numeric quiz id
         const numericQuizId = Number(quizId);
+        const userId = userProfile?.id ?? null;
         if (!Number.isNaN(numericQuizId) && numericQuizId > 0) {
           await fetch('/api/quiz-attempts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ userId, quizId: numericQuizId, score, totalQuestions })
+            body: JSON.stringify({ userId: userId || 1, quizId: numericQuizId, score, totalQuestions })
           });
         } else {
           console.debug('[handleQuizComplete] skipping server persist — quizId is non-numeric:', quizId);
         }
+
+        // Additionally, persist the updated profile (xp/coins/completedQuizzes) to the server if authenticated
+        if (isAuthenticated && newProfile && (newProfile.id || userProfile?.id)) {
+          const targetUserId = newProfile.id || userProfile?.id;
+          try {
+            await fetch('/api/auth/me', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ profile: { xp: newProfile.xp, coins: newProfile.coins, completedQuizzes: newProfile.completedQuizzes, level: newProfile.level } })
+            });
+          } catch (e) {
+            console.warn('Failed to persist profile to server:', e);
+          }
+        }
       } catch (err) {
         // falha ao persistir no servidor — manter localStorage (fallback já feito)
-        console.error('Failed to persist quiz attempt:', err);
+        console.error('Failed to persist quiz attempt or profile:', err);
       }
     })();
   };
