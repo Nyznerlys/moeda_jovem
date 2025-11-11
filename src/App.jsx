@@ -125,7 +125,20 @@ function App() {
   };
   
   const handleSetUsername = (username) => {
-    setUserProfile(prev => ({ ...prev, name: username, usernameSetupComplete: true }));
+    setUserProfile(prev => {
+      const newProfile = { ...prev, name: username, usernameSetupComplete: true };
+      try {
+        const usersRaw = localStorage.getItem('moedaJovemUsers');
+        const users = usersRaw ? JSON.parse(usersRaw) : {};
+        if (newProfile.email) {
+          users[newProfile.email] = newProfile;
+          localStorage.setItem('moedaJovemUsers', JSON.stringify(users));
+        }
+      } catch (e) {
+        // ignore storage errors
+      }
+      return newProfile;
+    });
     audioManager.playSound('achievement');
     toast({ title: "Nome de usuário salvo!", description: `Olá, ${username}!`});
   };
